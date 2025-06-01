@@ -1,13 +1,6 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-
-# 디바이스 설정
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-# 모델과 토크나이저 불러오기
-model_name = "Bllossom/llama-3.2-Korean-Bllossom-3B"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16).to(device)
+import requests
 
 # 요약용 프롬프트 구성 함수
 def build_prompt(text: str) -> str:
@@ -20,35 +13,62 @@ def build_prompt(text: str) -> str:
 	- 향후 과제 또는 Follow-up:
 
 회의록: {text}
-“””
-
-# 요약 실행 함수
-def summarize(text: str, max_new_tokens=1000) -> str:
-    prompt = build_prompt(text)
-    input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-
-    with torch.no_grad():
-        output_ids = model.generate(
-            input_ids,
-            max_new_tokens=max_new_tokens,
-            do_sample=True,
-            temperature=0.7,
-            top_p=0.9,
-            repetition_penalty=1.1,
-            eos_token_id=tokenizer.eos_token_id
-        )
-
-    output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-    summary = output_text.split("요약:")[-1].strip()
-    return summary
-
-# 테스트 예시
-input_text = """
-오늘 회의에서는 신제품 런칭 일정과 관련된 주요 논의가 있었습니다. 
-디자인팀은 UI 시안을 다음 주까지 완료하기로 했으며, 마케팅팀은 사전 홍보 전략을 구체화하기로 했습니다. 
-기술팀은 현재 베타 테스트 진행 상황을 공유하고, 버그 수정 일정을 보고했습니다.
 """
 
-result = summarize(input_text)
-print("\n[요약 결과]")
-print(result)
+API_KEY = "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"
+
+def summarize(text: str, max_new_tokens=1000) -> str:
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    prompt = build_prompt(text)
+    
+    data = {
+        "model": "google/gemma-3-27b-it:free",
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant specialized in summarizing meeting minutes."},
+            {"role": "user", "content": prompt}
+        ]
+    }
+
+    response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
+
+    if response.status_code == 200:
+        summary = response.json()['choices'][0]['message']['content']
+        return summary
+    else:
+        print(f"Error: {response.status_code}")
+        print(response.text)
+        return "요약 생성 중 오류가 발생했습니다."
+
+# # 요약 실행 함수
+# def summarize(text: str, max_new_tokens=1000) -> str:
+#     print('start summarize')
+#     print(text)
+
+#     device = "cuda" if torch.cuda.is_available() else "cpu"
+
+#     # 모델과 토크나이저 불러오기
+#     model_name = "Bllossom/llama-3.2-Korean-Bllossom-3B"
+#     tokenizer = AutoTokenizer.from_pretrained(model_name)
+#     model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16).to(device)
+
+#     prompt = build_prompt(text)
+#     input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+
+#     with torch.no_grad():
+#         output_ids = model.generate(
+#             input_ids,
+#             max_new_tokens=max_new_tokens,
+#             do_sample=True,
+#             temperature=0.7,
+#             top_p=0.9,
+#             repetition_penalty=1.1,
+#             eos_token_id=tokenizer.eos_token_id
+#         )
+
+#     output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+#     summary = output_text.split("회의록:")[-1].strip()
+#     return summary
