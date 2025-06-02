@@ -15,7 +15,7 @@ def build_prompt(text: str) -> str:
 회의록: {text}
 """
 
-API_KEY = "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"
+API_KEY = ""
 
 def summarize(text: str, max_new_tokens=1000) -> str:
     headers = {
